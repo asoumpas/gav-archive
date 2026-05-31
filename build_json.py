@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 FIELDS = [
     "ada", "issue_date", "decision_type", "subject",
-    "signer", "diavgeia_url", "document_url",
+    "signer", "amount", "region", "diavgeia_url", "document_url",
 ]
 
 
