@@ -8,133 +8,157 @@
 <style>
   :root{
     --ink:#13202a; --sea:#0a6e8c; --sea-deep:#073a4c;
-    --sand:#f4efe6; --line:#d8d0c2; --accent:#d98f2b;
+    --sand:#f4efe6; --line:#d8d0c2; --accent:#d98f2b; --good:#2e7d52;
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:Georgia,"Times New Roman",serif;
-    background:var(--sand);color:var(--ink)}
-  header{background:linear-gradient(160deg,var(--sea-deep),var(--sea));
-    color:#fff;padding:26px 22px;border-bottom:4px solid var(--accent)}
-  header h1{margin:0;font-size:1.4rem;letter-spacing:.5px}
-  header p{margin:6px 0 0;opacity:.85;font-size:.85rem}
-  .wrap{max-width:1100px;margin:0 auto;padding:20px}
-  .controls{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0;
-    background:#fff;padding:14px;border:1px solid var(--line);border-radius:8px}
-  .controls input,.controls select{padding:10px 12px;border:1px solid var(--line);
-    border-radius:6px;font-family:inherit;font-size:.92rem}
-  .controls input[type=text]{flex:1;min-width:220px}
-  .meta{font-size:.82rem;color:#5a5346;margin-bottom:12px}
-  .card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--sea);
-    border-radius:6px;padding:13px 16px;margin-bottom:11px}
-  .card .subj{font-size:1rem;font-weight:bold;margin:0 0 6px}
-  .card .row{font-size:.8rem;color:#5a5346;display:flex;flex-wrap:wrap;gap:13px;align-items:center}
+  body{margin:0;font-family:Georgia,"Times New Roman",serif;background:var(--sand);color:var(--ink)}
+  header{background:linear-gradient(160deg,var(--sea-deep),var(--sea));color:#fff;padding:24px 22px;border-bottom:4px solid var(--accent)}
+  header h1{margin:0;font-size:1.35rem;letter-spacing:.5px}
+  header p{margin:6px 0 0;opacity:.85;font-size:.82rem}
+  .wrap{max-width:1150px;margin:0 auto;padding:18px}
+  .controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:14px 0;background:#fff;padding:14px;border:1px solid var(--line);border-radius:8px}
+  .controls .full{grid-column:1 / -1}
+  .controls label{display:block;font-size:.72rem;color:#5a5346;margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
+  .controls input,.controls select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:.92rem}
+  .amtrow{display:flex;gap:8px}
+  .summary{display:flex;flex-wrap:wrap;gap:18px;background:var(--sea-deep);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px}
+  .summary .box{flex:1;min-width:140px}
+  .summary .num{font-size:1.5rem;font-weight:bold;color:#ffd9a0}
+  .summary .lbl{font-size:.74rem;opacity:.85;text-transform:uppercase;letter-spacing:.5px}
+  .card{background:#fff;border:1px solid var(--line);border-left:4px solid var(--sea);border-radius:6px;padding:12px 15px;margin-bottom:10px}
+  .card .subj{font-size:.98rem;font-weight:bold;margin:0 0 6px}
+  .card .row{font-size:.78rem;color:#5a5346;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
   .card a{color:var(--sea);text-decoration:none}
   .card a:hover{text-decoration:underline}
-  .tag{display:inline-block;background:var(--sand);border:1px solid var(--line);
-    padding:2px 9px;border-radius:20px;font-size:.72rem}
-  .pager{display:flex;justify-content:center;gap:8px;margin:22px 0;flex-wrap:wrap}
-  .pager button{padding:8px 14px;border:1px solid var(--line);border-radius:6px;
-    background:#fff;cursor:pointer;font-family:inherit;color:var(--ink)}
+  .tag{display:inline-block;background:var(--sand);border:1px solid var(--line);padding:2px 8px;border-radius:20px;font-size:.7rem}
+  .amt{color:var(--good);font-weight:bold}
+  .reg{background:#fbe9cf;border-color:#e6c693}
+  .pager{display:flex;justify-content:center;gap:8px;margin:20px 0;flex-wrap:wrap}
+  .pager button{padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;color:var(--ink)}
   .pager button:disabled{opacity:.4;cursor:default}
   .pager .cur{background:var(--sea);color:#fff;border-color:var(--sea)}
-  footer{text-align:center;padding:22px;color:#7a7263;font-size:.78rem}
+  footer{text-align:center;padding:20px;color:#7a7263;font-size:.76rem}
   .loading{text-align:center;padding:40px;color:#7a7263}
+  @media(max-width:680px){.controls{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <header>
   <h1>Αρχείο Πράξεων — Δήμος Γαύδου</h1>
-  <p>Επίσημες αποφάσεις & ανακοινώσεις από τη Δι@ύγεια · ιδιωτικό αρχείο</p>
+  <p>Επίσημες αποφάσεις & δαπάνες από τη Δι@ύγεια · σύνθετη αναζήτηση & υπολογισμοί</p>
 </header>
 <div class="wrap">
   <div class="controls">
-    <input type="text" id="q" placeholder="Αναζήτηση σε θέμα ή ΑΔΑ...">
-    <select id="type"><option value="">— Όλοι οι τύποι —</option></select>
-    <select id="year"><option value="">— Όλα τα έτη —</option></select>
+    <div class="full">
+      <label>Αναζήτηση (θέμα, ΑΔΑ, υπογράφων)</label>
+      <input type="text" id="q" placeholder="π.χ. Μαρκάκης, ασφαλτόστρωση, ΑΔΑ...">
+    </div>
+    <div><label>Τύπος πράξης</label><select id="type"><option value="">— Όλοι —</option></select></div>
+    <div><label>Έτος</label><select id="year"><option value="">— Όλα —</option></select></div>
+    <div><label>Περιοχή</label><select id="region"><option value="">— Όλες —</option></select></div>
+    <div><label>Ποσό από (€)</label><input type="number" id="amin" placeholder="0"></div>
+    <div><label>Ποσό έως (€)</label><input type="number" id="amax" placeholder="∞"></div>
+    <div><label>Ταξινόμηση</label><select id="sort">
+      <option value="date_desc">Ημ/νία (νεότερες)</option>
+      <option value="date_asc">Ημ/νία (παλαιότερες)</option>
+      <option value="amt_desc">Ποσό (μεγαλύτερο)</option>
+      <option value="amt_asc">Ποσό (μικρότερο)</option>
+    </select></div>
   </div>
-  <div class="meta" id="meta"></div>
+
+  <div class="summary">
+    <div class="box"><div class="num" id="s_count">—</div><div class="lbl">Αποτελέσματα</div></div>
+    <div class="box"><div class="num" id="s_sum">—</div><div class="lbl">Σύνολο ποσών (φιλτραρισμένων)</div></div>
+    <div class="box"><div class="num" id="s_withamt">—</div><div class="lbl">Με καταγεγραμμένο ποσό</div></div>
+  </div>
+
   <div id="list"><div class="loading">Φόρτωση δεδομένων…</div></div>
   <div class="pager" id="pager"></div>
 </div>
-<footer>
-  Πηγή: Πρόγραμμα Δι@ύγεια (CC-BY) · <span id="gen"></span>
-</footer>
+<footer>Πηγή: Πρόγραμμα Δι@ύγεια (CC-BY) · <span id="gen"></span><br>
+  <small>Σημείωση: τα ποσά και οι περιοχές προκύπτουν από τα μεταδεδομένα/θέμα κάθε πράξης· ορισμένες πράξεις δεν έχουν καταγεγραμμένο ποσό ή περιοχή.</small></footer>
 
 <script>
 const PER_PAGE = 25;
-let ALL = [], filtered = [], page = 1;
-
-const $ = id => document.getElementById(id);
-
+let ALL=[], filtered=[], page=1;
+const $=id=>document.getElementById(id);
 function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function eur(n){return n==null?"—":new Intl.NumberFormat("el-GR",{style:"currency",currency:"EUR"}).format(n);}
 
-function applyFilters(){
-  const q = $("q").value.trim().toLowerCase();
-  const t = $("type").value, y = $("year").value;
-  filtered = ALL.filter(a=>{
-    if(t && a.decision_type !== t) return false;
-    if(y && (a.issue_date||"").slice(0,4) !== y) return false;
-    if(q){
-      const hay = ((a.subject||"")+" "+(a.ada||"")).toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
+function apply(){
+  const q=$("q").value.trim().toLowerCase();
+  const t=$("type").value, y=$("year").value, r=$("region").value;
+  const amin=parseFloat($("amin").value), amax=parseFloat($("amax").value);
+  filtered=ALL.filter(a=>{
+    if(t && a.decision_type!==t) return false;
+    if(y && (a.issue_date||"").slice(0,4)!==y) return false;
+    if(r && !(a.region||"").includes(r)) return false;
+    if(!isNaN(amin) && !(a.amount!=null && a.amount>=amin)) return false;
+    if(!isNaN(amax) && !(a.amount!=null && a.amount<=amax)) return false;
+    if(q){const hay=((a.subject||"")+" "+(a.ada||"")+" "+(a.signer||"")).toLowerCase();
+      if(!hay.includes(q)) return false;}
     return true;
   });
-  page = 1;
-  render();
+  const s=$("sort").value;
+  filtered.sort((a,b)=>{
+    if(s==="date_asc") return (a.issue_date||"").localeCompare(b.issue_date||"");
+    if(s==="amt_desc") return (b.amount||0)-(a.amount||0);
+    if(s==="amt_asc")  return (a.amount||0)-(b.amount||0);
+    return (b.issue_date||"").localeCompare(a.issue_date||"");
+  });
+  page=1; render();
 }
 
 function render(){
-  const total = filtered.length;
-  const pages = Math.max(1, Math.ceil(total/PER_PAGE));
-  page = Math.min(page, pages);
-  const start = (page-1)*PER_PAGE;
-  const slice = filtered.slice(start, start+PER_PAGE);
+  const total=filtered.length;
+  const sum=filtered.reduce((acc,a)=>acc+(a.amount||0),0);
+  const withAmt=filtered.filter(a=>a.amount!=null).length;
+  $("s_count").textContent=total.toLocaleString("el-GR");
+  $("s_sum").textContent=eur(sum);
+  $("s_withamt").textContent=withAmt.toLocaleString("el-GR");
 
-  $("meta").textContent = `${total} αποτελέσματα · σελίδα ${page} από ${pages}`;
-
+  const pages=Math.max(1,Math.ceil(total/PER_PAGE));
+  page=Math.min(page,pages);
+  const slice=filtered.slice((page-1)*PER_PAGE,(page-1)*PER_PAGE+PER_PAGE);
   $("list").innerHTML = slice.length ? slice.map(a=>`
     <div class="card">
       <p class="subj">${esc(a.subject)||"(χωρίς θέμα)"}</p>
       <div class="row">
         <span class="tag">${esc(a.decision_type)||"—"}</span>
+        ${a.amount!=null?`<span class="amt">${eur(a.amount)}</span>`:""}
+        ${a.region?`<span class="tag reg">📍 ${esc(a.region)}</span>`:""}
+        <span>${esc((a.issue_date||"").slice(0,10))}</span>
         <span>ΑΔΑ: ${esc(a.ada)}</span>
-        <span>Έκδοση: ${esc((a.issue_date||"").slice(0,10))}</span>
-        ${a.signer?`<span>Υπογράφων: ${esc(a.signer)}</span>`:""}
+        ${a.signer?`<span>Υπογρ.: ${esc(a.signer)}</span>`:""}
         <span><a href="${esc(a.diavgeia_url)}" target="_blank" rel="noopener">Διαύγεια ↗</a></span>
-        ${a.document_url?`<span><a href="${esc(a.document_url)}" target="_blank" rel="noopener">Έγγραφο ↗</a></span>`:""}
       </div>
     </div>`).join("") : "<p>Δεν βρέθηκαν αποτελέσματα.</p>";
 
-  $("pager").innerHTML = `
+  $("pager").innerHTML=`
     <button ${page<=1?"disabled":""} onclick="go(${page-1})">‹ Προηγ.</button>
-    <button class="cur" disabled>${page}</button>
+    <button class="cur" disabled>${page} / ${pages}</button>
     <button ${page>=pages?"disabled":""} onclick="go(${page+1})">Επόμ. ›</button>`;
 }
-
 function go(p){page=p;render();window.scrollTo(0,0);}
 
-function fillFilters(){
-  const types = [...new Set(ALL.map(a=>a.decision_type).filter(Boolean))].sort();
-  const years = [...new Set(ALL.map(a=>(a.issue_date||"").slice(0,4)).filter(Boolean))].sort().reverse();
-  $("type").innerHTML += types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
-  $("year").innerHTML += years.map(y=>`<option value="${y}">${y}</option>`).join("");
+function fill(){
+  const types=[...new Set(ALL.map(a=>a.decision_type).filter(Boolean))].sort();
+  const years=[...new Set(ALL.map(a=>(a.issue_date||"").slice(0,4)).filter(Boolean))].sort().reverse();
+  const regions=[...new Set(ALL.flatMap(a=>(a.region||"").split(", ").filter(Boolean)))].sort();
+  $("type").innerHTML+=types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  $("year").innerHTML+=years.map(y=>`<option value="${y}">${y}</option>`).join("");
+  $("region").innerHTML+=regions.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join("");
 }
 
-["q","type","year"].forEach(id=>$(id).addEventListener("input", applyFilters));
+["q","type","year","region","amin","amax","sort"].forEach(id=>{
+  $(id).addEventListener("input",apply); $(id).addEventListener("change",apply);
+});
 
-fetch("data.json")
-  .then(r=>r.json())
-  .then(d=>{
-    ALL = d.acts || [];
-    filtered = ALL;
-    $("gen").textContent = d.generated_at ? ("ενημερώθηκε: "+d.generated_at.slice(0,10)) : "";
-    fillFilters();
-    render();
-  })
-  .catch(e=>{
-    $("list").innerHTML = "<p>Σφάλμα φόρτωσης δεδομένων. Δεν βρέθηκε το data.json.</p>";
-  });
+fetch("data.json").then(r=>r.json()).then(d=>{
+  ALL=d.acts||[]; filtered=ALL;
+  $("gen").textContent=d.generated_at?("ενημερώθηκε: "+d.generated_at.slice(0,10)+" · σύνολο "+d.count+" πράξεις"):"";
+  fill(); apply();
+}).catch(()=>{ $("list").innerHTML="<p>Σφάλμα φόρτωσης (δεν βρέθηκε data.json).</p>"; });
 </script>
 </body>
 </html>
