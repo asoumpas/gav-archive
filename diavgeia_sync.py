@@ -102,6 +102,15 @@ def latest_submission_ts(conn):
 # API helpers
 # ---------------------------------------------------------------------------
 
+def _json_compact(value):
+    """Last-resort: serialise a structure to compact JSON text."""
+    import json as _json
+    try:
+        return _json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    except Exception:
+        return str(value)
+
+
 def _ms_to_iso(value):
     """Diavgeia returns timestamps as epoch milliseconds. Normalise to ISO."""
     if value is None:
@@ -126,7 +135,22 @@ def parse_decision(d):
                 return d[k]
         return None
 
-    ada = first("ada", "ADA")
+    def flat(value):
+        """Coerce lists/dicts/numbers to a plain string the DB can store."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (int, float, bool)):
+            return str(value)
+        if isinstance(value, (list, tuple)):
+            return ", ".join(flat(v) for v in value if v not in (None, ""))
+        if isinstance(value, dict):
+            return value.get("label") or value.get("uid") or value.get("name") \
+                or _json_compact(value)
+        return str(value)
+
+    ada = flat(first("ada", "ADA"))
     issue = _ms_to_iso(first("issueDate", "issue_date"))
     submission = _ms_to_iso(
         first("submissionTimestamp", "publishTimestamp", "submission_ts")
@@ -150,17 +174,17 @@ def parse_decision(d):
 
     return {
         "ada": ada,
-        "protocol_number": first("protocolNumber", "protocol"),
-        "subject": first("subject", "title"),
-        "decision_type": decision_type,
-        "decision_type_id": decision_type_id,
-        "org_uid": org,
-        "org_label": org_label,
-        "unit": first("unitIds", "unit"),
-        "signer": first("signerIds", "signer"),
+        "protocol_number": flat(first("protocolNumber", "protocol")),
+        "subject": flat(first("subject", "title")),
+        "decision_type": flat(decision_type),
+        "decision_type_id": flat(decision_type_id),
+        "org_uid": flat(org),
+        "org_label": flat(org_label),
+        "unit": flat(first("unitIds", "unit")),
+        "signer": flat(first("signerIds", "signer")),
         "issue_date": issue,
         "submission_ts": submission,
-        "document_url": doc_url,
+        "document_url": flat(doc_url),
         "diavgeia_url": diavgeia_url,
         "raw_json": None,  # filled by caller (keeps parse_decision testable)
     }
