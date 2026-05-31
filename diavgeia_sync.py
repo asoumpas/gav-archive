@@ -153,17 +153,55 @@ def _json_compact(value):
 
 
 def _ms_to_iso(value):
-    """Diavgeia returns timestamps as epoch milliseconds. Normalise to ISO."""
-    if value is None:
+    """Normalise a Diavgeia date to ISO (YYYY-MM-DD...). Handles:
+      - epoch milliseconds (e.g. 1716800000000)
+      - epoch seconds (e.g. 1716800000)
+      - already-ISO strings ('2024-05-27...')
+      - Greek date strings ('27/05/2024', '27-05-2024')
+    Returns None when no valid date can be derived (so it's clearly 'unknown'
+    rather than a garbage value that breaks the year filter)."""
+    import re
+    if value is None or value == "":
         return None
-    try:
-        # already a string date?
-        if isinstance(value, str) and not value.isdigit():
-            return value
-        ms = int(value)
-        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
-    except (ValueError, TypeError, OSError):
-        return str(value)
+
+    # Numeric epoch (ms or seconds), possibly as a numeric string
+    if isinstance(value, (int, float)) or (
+            isinstance(value, str) and value.strip().isdigit()):
+        try:
+            n = int(value)
+            # Heuristic: 13-digit -> ms, 10-digit -> seconds
+            if n > 1_000_000_000_000:      # milliseconds
+                n = n / 1000
+            elif n > 1_000_000_000:        # seconds
+                n = float(n)
+            else:
+                return None                # too small to be a real date
+            return datetime.fromtimestamp(n, tz=timezone.utc).isoformat()
+        except (ValueError, TypeError, OSError):
+            return None
+
+    if isinstance(value, str):
+        s = value.strip()
+        # Already ISO-ish? keep it.
+        if re.match(r"^\d{4}-\d{2}-\d{2}", s):
+            return s
+        # Greek/European DD/MM/YYYY or DD-MM-YYYY (optional time)
+        m = re.match(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})", s)
+        if m:
+            d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            try:
+                return datetime(y, mo, d, tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                return None
+        # YYYY/MM/DD
+        m = re.match(r"^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})", s)
+        if m:
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            try:
+                return datetime(y, mo, d, tzinfo=timezone.utc).isoformat()
+            except ValueError:
+                return None
+    return None
 
 
 # Οικισμοί / περιοχές του Δήμου Γαύδου. Κάθε περιοχή με τις παραλλαγές
