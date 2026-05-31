@@ -87,11 +87,49 @@ CREATE TABLE IF NOT EXISTS sync_log (
 """
 
 
-def connect(db_path):
+def connect(db_path, rebuild=False):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    if rebuild:
+        conn.executescript("DROP TABLE IF EXISTS decisions;")
+        conn.commit()
+    _migrate(conn)            # add any missing columns to an existing DB
     conn.executescript(SCHEMA)
     return conn
+
+
+REQUIRED_COLS = {
+    "ada", "protocol_number", "subject", "decision_type", "decision_type_id",
+    "org_uid", "org_label", "unit", "signer", "amount", "region",
+    "issue_date", "submission_ts", "document_url", "diavgeia_url",
+    "raw_json", "fetched_at",
+}
+
+
+def _migrate(conn):
+    """Bring an older database up to date. If the existing table is missing
+    several columns (structurally outdated), drop and recreate it so SCHEMA
+    can build it cleanly. Otherwise just add the few missing columns."""
+    try:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(decisions)")}
+    except sqlite3.DatabaseError:
+        return
+    if not cols:
+        return  # no table yet
+    missing = REQUIRED_COLS - cols
+    if not missing:
+        return
+    # If only the new optional columns are missing, add them in place.
+    if missing <= {"amount", "region"}:
+        for col, coltype in (("amount", "REAL"), ("region", "TEXT")):
+            if col not in cols:
+                conn.execute(
+                    f"ALTER TABLE decisions ADD COLUMN {col} {coltype}")
+        conn.commit()
+        return
+    # Otherwise the schema is too different — rebuild from scratch.
+    conn.executescript("DROP TABLE IF EXISTS decisions;")
+    conn.commit()
 
 
 def latest_submission_ts(conn):
@@ -419,7 +457,9 @@ def find_working_query():
 
 
 def sync(db_path, full=False):
-    conn = connect(db_path)
+    # On a full run, rebuild the table from scratch so the schema is always
+    # current (avoids "no such column" errors from older databases).
+    conn = connect(db_path, rebuild=full)
     query = find_working_query()
 
     stop_at = None if full else latest_submission_ts(conn)
