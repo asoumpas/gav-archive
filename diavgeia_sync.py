@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     org_label        TEXT,
     unit             TEXT,               -- μονάδα / οργανική θέση
     signer           TEXT,               -- υπογράφων
+    amount           REAL,               -- ποσό σε ευρώ (αν υπάρχει)
+    region           TEXT,               -- περιοχή/οικισμός (από το θέμα)
     issue_date       TEXT,               -- ημερομηνία έκδοσης (ISO)
     submission_ts    TEXT,               -- ημερομηνία ανάρτησης (ISO)
     document_url     TEXT,               -- link στο PDF / έγγραφο
@@ -72,6 +74,7 @@ CREATE TABLE IF NOT EXISTS decisions (
 CREATE INDEX IF NOT EXISTS idx_issue_date ON decisions(issue_date);
 CREATE INDEX IF NOT EXISTS idx_type       ON decisions(decision_type);
 CREATE INDEX IF NOT EXISTS idx_submission ON decisions(submission_ts);
+CREATE INDEX IF NOT EXISTS idx_region     ON decisions(region);
 
 CREATE TABLE IF NOT EXISTS sync_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -125,6 +128,120 @@ def _ms_to_iso(value):
         return str(value)
 
 
+# Οικισμοί / περιοχές του Δήμου Γαύδου. Κάθε περιοχή με τις παραλλαγές
+# γραφής που μπορεί να εμφανιστούν στα θέματα των αποφάσεων.
+GAVDOS_REGIONS = {
+    "Καστρί": ["καστρι", "καστρί"],
+    "Βατσιανά": ["βατσιανα", "βατσιανά", "βατσσιανα"],
+    "Άμπελος": ["αμπελος", "άμπελος", "αμπελο"],
+    "Καραβέ": ["καραβε", "καραβέ", "καραβές", "λιμανι καραβε", "λιμάνι"],
+    "Φωκιά": ["φωκια", "φωκιά", "φοκια"],
+    "Άγιος Ιωάννης": ["αγιος ιωαννης", "άγιος ιωάννης", "αη γιαννης",
+                       "αη γιάννη", "αϊ γιαννης", "άι γιάννη"],
+    "Σαρακήνικο": ["σαρακηνικο", "σαρακήνικο"],
+    "Κόρφος": ["κορφος", "κόρφος"],
+    "Λαύρακας": ["λαυρακας", "λαύρακας"],
+    "Τρυπητή": ["τρυπητη", "τρυπητή"],
+    "Ποταμός": ["ποταμος", "ποταμός"],
+    "Μετόχια": ["μετοχια", "μετόχια"],
+    "Ξενάκι": ["ξενακι", "ξενάκι"],
+    "Γαυδοπούλα": ["γαυδοπουλα", "γαυδοπούλα"],
+}
+
+
+def _detect_region(subject):
+    """Return any Gavdos place-names found in the subject text, comma-joined.
+    Note: based on the subject only; many acts don't name a place, so a blank
+    region does NOT mean the act is island-wide."""
+    if not subject:
+        return None
+    low = subject.lower()
+    found = []
+    for canonical, variants in GAVDOS_REGIONS.items():
+        if any(v in low for v in variants):
+            found.append(canonical)
+    return ", ".join(found) if found else None
+
+
+def _extract_amount(d):
+    """Best-effort numeric amount (euros) for an act. Diavgeia stores monetary
+    values in several possible places depending on the decision type. We try
+    the structured fields first; return a float or None."""
+    # Direct numeric keys sometimes present on expense acts
+    for key in ("awardAmount", "amountWithVAT", "amountWithoutVAT",
+                "totalAmount", "budgettotal", "amount"):
+        v = d.get(key)
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            n = _parse_money(v)
+            if n is not None:
+                return n
+    # Structured "extraFieldValues" used by the new system
+    efv = d.get("extraFieldValues") or d.get("extraFields")
+    if isinstance(efv, dict):
+        for key in ("awardAmount", "amountWithVAT", "amount", "value",
+                    "totalAmount"):
+            v = efv.get(key)
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, dict):
+                vv = v.get("amount") or v.get("value")
+                if isinstance(vv, (int, float)):
+                    return float(vv)
+                if isinstance(vv, str):
+                    n = _parse_money(vv)
+                    if n is not None:
+                        return n
+            if isinstance(v, str):
+                n = _parse_money(v)
+                if n is not None:
+                    return n
+    return None
+
+
+def _parse_money(s):
+    """Parse a money-like string to float, handling Greek and intl formats:
+        '1.234,56' -> 1234.56   (Greek: . thousands, , decimal)
+        '1,234.56' -> 1234.56   (Intl:  , thousands, . decimal)
+        '88.000'   -> 88000     (Greek thousands, no decimals)
+        '500,00'   -> 500.00
+    """
+    import re
+    if not s:
+        return None
+    txt = re.sub(r"[^0-9.,]", "", str(s))
+    if not txt:
+        return None
+
+    has_dot = "." in txt
+    has_comma = "," in txt
+
+    if has_dot and has_comma:
+        # The last-occurring separator is the decimal one.
+        if txt.rfind(",") > txt.rfind("."):
+            txt = txt.replace(".", "").replace(",", ".")   # Greek
+        else:
+            txt = txt.replace(",", "")                      # Intl
+    elif has_comma:
+        # Comma only -> decimal separator
+        txt = txt.replace(",", ".")
+    elif has_dot:
+        # Dot only: decide if it's decimals or thousands.
+        parts = txt.split(".")
+        # exactly one dot with 1-2 trailing digits => decimal (e.g. 88.5)
+        if len(parts) == 2 and len(parts[1]) in (1, 2):
+            pass  # keep as decimal
+        else:
+            txt = txt.replace(".", "")  # thousands separators -> 88.000 = 88000
+
+    try:
+        val = float(txt)
+        return val if 0 < val < 1e12 else None
+    except ValueError:
+        return None
+
+
 def parse_decision(d):
     """Map one API record to our flat row. The API field names can vary
     slightly between versions, so we look up several likely keys."""
@@ -172,16 +289,22 @@ def parse_decision(d):
         decision_type_id = str(dt)
         decision_type = str(dt)
 
+    amount = _extract_amount(d)
+    subject_text = flat(first("subject", "title")) or ""
+    region = _detect_region(subject_text)
+
     return {
         "ada": ada,
         "protocol_number": flat(first("protocolNumber", "protocol")),
-        "subject": flat(first("subject", "title")),
+        "subject": subject_text,
         "decision_type": flat(decision_type),
         "decision_type_id": flat(decision_type_id),
         "org_uid": flat(org),
         "org_label": flat(org_label),
         "unit": flat(first("unitIds", "unit")),
         "signer": flat(first("signerIds", "signer")),
+        "amount": amount,
+        "region": region,
         "issue_date": issue,
         "submission_ts": submission,
         "document_url": flat(doc_url),
@@ -247,16 +370,18 @@ def iter_decisions(query, stop_at_submission=None):
 UPSERT = """
 INSERT INTO decisions (
     ada, protocol_number, subject, decision_type, decision_type_id,
-    org_uid, org_label, unit, signer, issue_date, submission_ts,
+    org_uid, org_label, unit, signer, amount, region, issue_date, submission_ts,
     document_url, diavgeia_url, raw_json, fetched_at
 ) VALUES (
     :ada, :protocol_number, :subject, :decision_type, :decision_type_id,
-    :org_uid, :org_label, :unit, :signer, :issue_date, :submission_ts,
+    :org_uid, :org_label, :unit, :signer, :amount, :region, :issue_date, :submission_ts,
     :document_url, :diavgeia_url, :raw_json, :fetched_at
 )
 ON CONFLICT(ada) DO UPDATE SET
     subject       = excluded.subject,
     decision_type = excluded.decision_type,
+    amount        = excluded.amount,
+    region        = excluded.region,
     document_url  = excluded.document_url,
     raw_json      = excluded.raw_json,
     fetched_at    = excluded.fetched_at;
