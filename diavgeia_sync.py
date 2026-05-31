@@ -30,8 +30,9 @@ import requests
 # ---------------------------------------------------------------------------
 
 # Organization identifier for the Municipality of Gavdos on Diavgeia.
-# This is the short uid used on https://et.diavgeia.gov.gr/f/gavdou_dimos
-ORG_UID = "gavdou_dimos"
+# The open-data API expects the NUMERIC organization uid (6064), not the
+# latin name "gavdou_dimos" that appears in the website URL.
+ORG_UID = "6064"
 
 API_BASE = "https://opendata.diavgeia.gov.gr/luminapi/api"
 SEARCH_URL = f"{API_BASE}/search"
@@ -238,9 +239,39 @@ ON CONFLICT(ada) DO UPDATE SET
 """
 
 
+def total_for_query(query):
+    """Return how many acts a query matches (0 on any failure)."""
+    try:
+        data = fetch_page(query, 0, size=1)
+        info = data.get("info") or {}
+        return int(info.get("total") or info.get("totalRecords") or 0)
+    except Exception:
+        return 0
+
+
+def find_working_query():
+    """Diavgeia's API has shifted org identifiers over time. Try the known
+    candidates for the Municipality of Gavdos and use whichever returns acts."""
+    candidates = [
+        'organizationUid:"6064"',          # legacy numeric uid
+        'organizationUid:"gavdou_dimos"',   # latin name
+        'organizationUid:6064',             # unquoted numeric
+    ]
+    for q in candidates:
+        n = total_for_query(q)
+        print(f"  Trying {q} -> {n} acts")
+        if n > 0:
+            print(f"  Using query: {q}")
+            return q
+    # Nothing matched; fall back to the first candidate so the run still
+    # completes (with 0 acts) instead of crashing.
+    print("  WARNING: no candidate returned acts; using default.")
+    return candidates[0]
+
+
 def sync(db_path, full=False):
     conn = connect(db_path)
-    query = f'organizationUid:"{ORG_UID}"'
+    query = find_working_query()
 
     stop_at = None if full else latest_submission_ts(conn)
     mode = "full" if (full or stop_at is None) else "incremental"
